@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 drone-import = "drone_import.cli:main"
+merge-clips = "drone_import.merge_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
