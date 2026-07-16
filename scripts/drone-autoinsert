@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # Triggered by systemd when a USB storage block device is inserted.
-# Identifies HDZero BoxPro (vfat) or DJI cameras (exfat) and runs drone-import.
-# DRONE_USER is replaced by install.sh.
+# Mounts the device, identifies HDZero BoxPro or DJI camera by DCIM structure,
+# runs drone-import (via Docker if available), then cleans up.
+# REPLACE_USER and REPLACE_MEDIA_VOL are substituted by install.sh.
 
 set -uo pipefail
 
 DEVNODE="/dev/${1:-}"
 MOUNT="/mnt/drone-import"
 DRONE_USER="REPLACE_USER"
+MEDIA_VOL="REPLACE_MEDIA_VOL"
+DOCKER_IMAGE="${DRONE_IMPORT_IMAGE:-drone-import}"
+CONFIG_DIR="/home/$DRONE_USER/.config/drone-import"
 
 [[ -b "$DEVNODE" ]] || exit 0
 
@@ -15,10 +19,25 @@ mkdir -p "$MOUNT"
 
 run_import() {
     local device="$1"
-    runuser -u "$DRONE_USER" -- \
-        env HOME="/home/$DRONE_USER" \
-            PATH="/home/$DRONE_USER/.local/bin:/usr/local/bin:/usr/bin:/bin" \
-        drone-import run "$device" --mount "$MOUNT"
+
+    if command -v docker &>/dev/null && docker image inspect "$DOCKER_IMAGE" &>/dev/null 2>&1; then
+        docker run --rm \
+            -v "$MOUNT:/mnt/drone-import:ro" \
+            -v "$MEDIA_VOL:$MEDIA_VOL" \
+            -v "$CONFIG_DIR:/root/.config/drone-import:ro" \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e "DRONE_IMPORT_IMAGE=$DOCKER_IMAGE" \
+            -e "DRONE_MEDIA_VOL=$MEDIA_VOL" \
+            "$DOCKER_IMAGE" \
+            drone-import run "$device" --mount /mnt/drone-import
+    else
+        # Fallback: run natively as the drone user
+        runuser -u "$DRONE_USER" -- \
+            env HOME="/home/$DRONE_USER" \
+                PATH="/home/$DRONE_USER/.local/bin:/usr/local/bin:/usr/bin:/bin" \
+            drone-import run "$device" --mount "$MOUNT"
+    fi
+
     # Cleanup runs as root here — no sudo needed
     drone-sd-cleanup "$MOUNT" 2>/dev/null || true
 }

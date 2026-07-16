@@ -17,19 +17,20 @@ Plug in an SD card — footage gets copied, backed up, merged into one file per 
 ## Requirements
 
 - Linux with systemd and udev
-- `ffmpeg` and `ffprobe`
-- Python 3.10+
-- `exfatprogs` or `exfat-fuse` for DJI cards: `sudo apt install exfatprogs`
+- Docker
+- `exfatprogs` for DJI cards (exFAT filesystem driver — must be on the host): `sudo apt install exfatprogs`
+
+Everything else (ffmpeg, Python) runs inside the Docker image.
 
 ## Install
 
 ```bash
-git clone https://github.com/youruser/drone-import
+git clone https://github.com/ExcuseMi/drone-import
 cd drone-import
 sudo ./install.sh
 ```
 
-The installer asks for your footage destination, backup path, and optional Jellyfin settings. It sets up udev, systemd, config, and the Python package.
+The installer asks for your footage destination, backup path, and optional Jellyfin settings. It builds the Docker image and wires up udev and systemd.
 
 ## Config
 

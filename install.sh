@@ -23,9 +23,13 @@ echo "Installing for user: $DRONE_USER"
 echo
 
 # Check dependencies
-for cmd in ffmpeg ffprobe python3 pipx; do
-    command -v "$cmd" &>/dev/null || error "Missing dependency: $cmd (install with: sudo apt install ${cmd})"
+for cmd in docker; do
+    command -v "$cmd" &>/dev/null || error "Missing dependency: $cmd — install Docker: https://docs.docker.com/engine/install/"
 done
+# exfatprogs is needed on the host to mount DJI (exFAT) cards
+if ! dpkg -l exfatprogs &>/dev/null && ! dpkg -l exfat-fuse &>/dev/null; then
+    warn "exfatprogs not found — DJI cards (exFAT) won't mount. Install with: sudo apt install exfatprogs"
+fi
 
 # Gather settings
 ask DEST        "Footage destination"  "/mnt/media/home_movies/Drone"
@@ -40,10 +44,9 @@ if [[ -n "$JELLYFIN_URL" ]]; then
 fi
 echo
 
-# Install Python package via pipx (isolated venv, no system package conflicts)
-info "Installing drone-import Python package..."
-runuser -u "$DRONE_USER" -- pipx install "$REPO_DIR" 2>/dev/null \
-    || runuser -u "$DRONE_USER" -- pipx reinstall drone-import
+# Build Docker image
+info "Building Docker image..."
+docker build -t drone-import "$REPO_DIR"
 
 # Config directory
 info "Setting up config..."
@@ -78,10 +81,11 @@ for dev_file in "$REPO_DIR/devices/"*.yaml; do
     fi
 done
 
-# drone-autoinsert (substitute DRONE_USER placeholder)
+# drone-autoinsert (substitute placeholders)
 info "Installing /usr/local/bin/drone-autoinsert..."
-sed "s/REPLACE_USER/$DRONE_USER/g" "$REPO_DIR/scripts/drone-autoinsert" \
-    > /usr/local/bin/drone-autoinsert
+sed -e "s/REPLACE_USER/$DRONE_USER/g" \
+    -e "s|REPLACE_MEDIA_VOL|$DEST|g" \
+    "$REPO_DIR/scripts/drone-autoinsert" > /usr/local/bin/drone-autoinsert
 chmod 755 /usr/local/bin/drone-autoinsert
 
 # drone-sd-cleanup
