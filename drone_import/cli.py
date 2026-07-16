@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from .compress import compress_background, compress_file
+from .compress import compress_file
 from .config import load_config
 from .importer import run_import
 from .jellyfin import trigger_scan
@@ -29,22 +29,12 @@ def run(device: str, mount: str | None, dry_run: bool, cleanup: bool) -> None:
 @main.command()
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 def compress(file: Path) -> None:
-    """Compress a file to CRF-28 H.264 in-place (synchronous).
-
-    When called from the auto-import pipeline this runs inside its own
-    background container. For manual use outside Docker it starts a
-    detached background process instead.
-    """
-    from .compress import _in_docker
-    if _in_docker():
-        click.echo(f"Compressing {file.name}...")
-        ok = compress_file(file)
-        if not ok:
-            click.echo(f"Failed: {file}", err=True)
-            raise SystemExit(1)
-    else:
-        compress_background(file, file.stem)
-        click.echo(f"Compression started for {file.name}")
+    """Compress a file to CRF-28 H.264 in-place (runs synchronously inside its container)."""
+    click.echo(f"Compressing {file.name}...")
+    ok = compress_file(file)
+    if not ok:
+        click.echo(f"Failed: {file}", err=True)
+        raise SystemExit(1)
 
 
 @main.command()

@@ -27,15 +27,8 @@ def compress_file(src: Path) -> bool:
 
 
 def compress_background(src: Path, session_name: str) -> None:
-    """Start compression in the background, adapting to the runtime environment."""
-    if _in_docker():
-        _docker_compress(src, session_name)
-    else:
-        _native_compress(src, session_name)
-
-
-def _in_docker() -> bool:
-    return Path("/.dockerenv").exists()
+    """Spawn a sibling container to compress src in the background."""
+    _docker_compress(src, session_name)
 
 
 def _docker_compress(src: Path, session_name: str) -> None:
@@ -57,33 +50,6 @@ def _docker_compress(src: Path, session_name: str) -> None:
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-
-
-def _native_compress(src: Path, session_name: str) -> None:
-    """systemd-run when available (survives service exit), falls back to detached subprocess."""
-    tmp = src.parent / f".{session_name}.tmp"
-    cmd = (
-        f"echo 'start: {session_name}' | systemd-cat -t drone-compress 2>/dev/null; "
-        f"ffmpeg -hide_banner -loglevel error -y -i {_q(src)} "
-        f"-c:v libx264 -crf 28 -preset medium -pix_fmt yuv420p -an -f mp4 {_q(tmp)} "
-        f"&& mv {_q(tmp)} {_q(src)} "
-        f"&& echo \"done: $(du -h {_q(src)} | cut -f1)\" | systemd-cat -t drone-compress 2>/dev/null "
-        f"|| {{ echo 'FAILED: {session_name}' | systemd-cat -t drone-compress 2>/dev/null; rm -f {_q(tmp)}; }}"
-    )
-    unit = f"drone-compress-{session_name.replace(' ', '-')}"
-    result = subprocess.run(
-        ["systemd-run", "--no-block", f"--unit={unit}", f"--description=Compress {session_name}",
-         "bash", "-c", cmd],
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        subprocess.Popen(
-            ["bash", "-c", cmd],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
 
 
 def _q(p: Path) -> str:
