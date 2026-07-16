@@ -1,0 +1,9 @@
+name: HDZero BoxPro
+mount: /mnt/drone-import
+dcim_glob: DCIM/100HDZRO
+file_ext: ts
+# Filename format: YYYYMMDD-HHMMSS.ts
+date_regex: '^(\d{4})(\d{2})(\d{2})-(\d{2})'
+# Fall back to file mtime for files with non-date names (e.g. hdz_0001.ts)
+mtime_fallback: true
+clip_start_skip: 3

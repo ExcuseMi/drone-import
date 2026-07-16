@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Triggered by systemd when a USB storage block device is inserted.
+# Identifies HDZero BoxPro (vfat) or DJI cameras (exfat) and runs drone-import.
+# DRONE_USER is replaced by install.sh.
+
+set -uo pipefail
+
+DEVNODE="/dev/${1:-}"
+MOUNT="/mnt/drone-import"
+DRONE_USER="REPLACE_USER"
+
+[[ -b "$DEVNODE" ]] || exit 0
+
+mkdir -p "$MOUNT"
+
+run_import() {
+    local device="$1"
+    runuser -u "$DRONE_USER" -- \
+        env HOME="/home/$DRONE_USER" \
+            PATH="/home/$DRONE_USER/.local/bin:/usr/local/bin:/usr/bin:/bin" \
+        drone-import run "$device" --mount "$MOUNT"
+    # Cleanup runs as root here — no sudo needed
+    drone-sd-cleanup "$MOUNT" 2>/dev/null || true
+}
+
+# HDZero BoxPro — FAT32
+if mount -t vfat "$DEVNODE" "$MOUNT" 2>/dev/null; then
+    if [[ -d "$MOUNT/DCIM/100HDZRO" ]]; then
+        run_import hdzero
+        exit 0
+    fi
+    umount "$MOUNT" 2>/dev/null || true
+fi
+
+# DJI cameras — exFAT
+if mount -t exfat "$DEVNODE" "$MOUNT" 2>/dev/null; then
+    if compgen -G "$MOUNT/DCIM/DJI_*/*.MP4" > /dev/null 2>&1; then
+        run_import dji
+        exit 0
+    fi
+    umount "$MOUNT" 2>/dev/null || true
+fi
+
+exit 0

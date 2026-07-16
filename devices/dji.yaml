@@ -1,0 +1,8 @@
+name: DJI O4 Lite
+mount: /mnt/drone-import
+dcim_glob: DCIM/DJI_*
+file_ext: MP4
+# Filename format: DJI_YYYYMMDDHHMMSS_NNNN_D.MP4
+date_regex: '^DJI_(\d{4})(\d{2})(\d{2})(\d{2})'
+mtime_fallback: false
+clip_start_skip: 3

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Clears drone footage from SD card and unmounts.
+# Must run as root. Listed in sudoers for passwordless use by the drone user.
+
+set -euo pipefail
+
+MOUNT="${1:-}"
+
+if [[ -z "$MOUNT" || ! "$MOUNT" =~ ^/mnt/ ]]; then
+    echo "Usage: drone-sd-cleanup /mnt/<mountpoint>" >&2
+    exit 1
+fi
+
+if ! mountpoint -q "$MOUNT" 2>/dev/null; then
+    exit 0
+fi
+
+DCIM="$MOUNT/DCIM"
+[[ -d "$DCIM" ]] && find "$DCIM" -type f \( -iname "*.ts" -o -iname "*.mp4" -o -iname "*.jpg" -o -iname "*.jpeg" \) -delete
+[[ -d "$MOUNT/MISC/THM" ]] && find "$MOUNT/MISC/THM" -type f -delete
+
+umount "$MOUNT"

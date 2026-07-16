@@ -1,0 +1,17 @@
+# Where merged footage is written
+dest: /mnt/media/home_movies/Drone
+
+# Where original uncompressed clips are kept as backup
+backup_root: /mnt/media/originals
+
+# Skip clips shorter than this (seconds)
+min_duration: 10
+
+# Trim this many seconds from the start of each clip before merging (seconds)
+# Override per device in devices/<name>.yaml
+clip_start_skip: 0
+
+# Jellyfin — leave blank to disable
+jellyfin_url: http://localhost:8096
+jellyfin_api_key: ""
+jellyfin_library_id: ""

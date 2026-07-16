@@ -1,0 +1,11 @@
+[Unit]
+Description=Drone SD card import (%i)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/drone-autoinsert %i
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=drone-import
+TimeoutStartSec=600
