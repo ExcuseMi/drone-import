@@ -75,6 +75,10 @@ drone-import run dji --dry-run     # preview without doing anything
 drone-import compress video.mp4    # compress a specific file in background
 drone-import scan                  # trigger Jellyfin scan
 drone-import list-devices          # show configured devices
+
+merge-clips                        # merge clips in current directory
+merge-clips /path/to/folder        # merge clips in a specific folder
+merge-clips -n                     # dry run — show groups without merging
 ```
 
 ## Logs

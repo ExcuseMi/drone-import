@@ -77,6 +77,10 @@ for dev_file in "$REPO_DIR/devices/"*.yaml; do
     fi
 done
 
+# merge-clips
+info "Installing /usr/local/bin/merge-clips..."
+install -m 755 "$REPO_DIR/scripts/merge-clips" /usr/local/bin/merge-clips
+
 # drone-autoinsert (substitute DRONE_USER placeholder)
 info "Installing /usr/local/bin/drone-autoinsert..."
 sed "s/REPLACE_USER/$DRONE_USER/g" "$REPO_DIR/scripts/drone-autoinsert" \

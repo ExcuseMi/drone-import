@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# Merge video clips that belong together (same camera/source, split into
+# multiple files) into one video per group, in the right order.
+#
+# Run it from inside the folder you want to process, or pass a directory:
+#   merge-clips
+#   merge-clips /mnt/media/home_movies/Drone/2026-06-21\ Voetbalveld
+#
+# Grouping: files are grouped by their "skeleton" (filename with all digit
+# runs stripped, plus extension). E.g. DJI_0019.MOV and DJI_0023.MOV share
+# the skeleton "dji_.mov"; DJI_20260621191704_0003_D.MP4 shares a different
+# skeleton "dji__d.mp4". This is how DJI (and most drones/goggles) name
+# split recordings, so each distinct camera/source ends up in its own group.
+#
+# Within a group, files are sorted with natural/version sort on the
+# filename, which matches chronological order for sequence numbers and
+# embedded timestamps alike.
+#
+# Merging uses ffmpeg's concat demuxer with stream copy (fast, lossless),
+# which requires all files in a group to share the same codec/resolution.
+# If stream copy fails, the group is automatically retried with a
+# re-encode (concat filter) instead.
+#
+# After a successful merge, the source clips are deleted automatically.
+# Paired thumbnail images (e.g. BoxPro .jpg files) are also removed.
+
+set -uo pipefail
+
+VIDEO_EXTS_RE='\.(mp4|mov|mkv|avi|m4v|mts|m2ts|ts)$'
+DRY_RUN=0
+TARGET_DIR="."
+# Set MERGE_NO_AUDIO=1 in the environment to strip audio from the output
+AUDIO_FLAG=""
+[[ "${MERGE_NO_AUDIO:-0}" == "1" ]] && AUDIO_FLAG="-an"
+
+usage() {
+    cat <<'EOF'
+Usage: merge-clips [-n] [DIR]
+
+  -n, --dry-run   Show the groups and merge order without doing anything
+  DIR             Folder to process (default: current directory)
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n|--dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) TARGET_DIR="$1"; shift ;;
+    esac
+done
+
+cd "$TARGET_DIR" || { echo "No such directory: $TARGET_DIR" >&2; exit 1; }
+echo "Scanning: $(pwd)"
+
+shopt -s nullglob nocaseglob
+
+declare -A GROUP_FILES   # skeleton -> newline-separated filenames
+
+for f in *; do
+    [[ -f "$f" ]] || continue
+    lower=$(tr '[:upper:]' '[:lower:]' <<<"$f")
+    [[ "$lower" =~ $VIDEO_EXTS_RE ]] || continue
+    [[ "$f" == *_merged.* ]] && continue   # skip previously merged output
+
+    skeleton=$(echo "$lower" | sed -E 's/[0-9]+//g')
+    GROUP_FILES["$skeleton"]+="$f"$'\n'
+done
+
+if [[ ${#GROUP_FILES[@]} -eq 0 ]]; then
+    echo "No video files found to merge."
+    exit 0
+fi
+
+MOVED_ANY=0
+
+merge_group() {
+    local skeleton="$1" out="$2" listfile="$3" reencode="$4"
+    if [[ "$reencode" == 0 ]]; then
+        ffmpeg -hide_banner -loglevel error -y -f concat -safe 0 -i "$listfile" -c copy $AUDIO_FLAG -movflags +faststart "$out"
+    else
+        ffmpeg -hide_banner -loglevel error -y -f concat -safe 0 -i "$listfile" -c:v libx264 -crf 18 -preset medium -c:a aac -b:a 192k $AUDIO_FLAG -movflags +faststart "$out"
+    fi
+}
+
+for skeleton in "${!GROUP_FILES[@]}"; do
+    mapfile -t files < <(echo -n "${GROUP_FILES[$skeleton]}" | sort -V)
+    count=${#files[@]}
+
+    ext="${files[0]##*.}"
+    # Remux TS (transport stream) into MP4 — HEVC stream copy works cleanly, better container
+    out_ext="${ext,,}"
+    [[ "$out_ext" == "ts" ]] && out_ext="mp4"
+    folder_name="$(basename "$(pwd)")"
+    out="${folder_name}.${out_ext}"
+    # If a file with that name already exists from another group (same ext), add a counter
+    if [[ -e "$out" ]]; then
+        n=2
+        while [[ -e "${folder_name}_${n}.${out_ext}" ]]; do ((n++)); done
+        out="${folder_name}_${n}.${out_ext}"
+    fi
+
+    echo
+    echo "Group [$skeleton] -> $out ($count file(s), input ext: .${ext})"
+    for f in "${files[@]}"; do echo "    $f"; done
+
+    if [[ $count -lt 2 ]]; then
+        echo "  -> only one file, nothing to merge, skipping"
+        continue
+    fi
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        continue
+    fi
+
+    listfile=$(mktemp)
+    for f in "${files[@]}"; do
+        printf "file '%s'\n" "$(realpath "$f" | sed "s/'/'\\\\''/g")" >> "$listfile"
+    done
+
+    echo "  merging (stream copy)..."
+    if merge_group "$skeleton" "$out" "$listfile" 0; then
+        echo "  ok -> $out"
+    else
+        echo "  stream copy failed, retrying with re-encode..."
+        if merge_group "$skeleton" "$out" "$listfile" 1; then
+            echo "  ok -> $out (re-encoded)"
+        else
+            echo "  FAILED to merge group [$skeleton], leaving originals in place" >&2
+            rm -f "$listfile"
+            continue
+        fi
+    fi
+    rm -f "$listfile"
+
+    mkdir -p originals
+    for f in "${files[@]}"; do
+        mv -- "$f" originals/
+        # Remove paired thumbnail (BoxPro and similar cameras drop a .jpg next to each clip)
+        base="${f%.*}"
+        for thumb in "${base}.jpg" "${base}.JPG" "${base}.jpeg" "${base}.JPEG"; do
+            [[ -f "$thumb" ]] && rm -f "$thumb" && echo "  removed thumbnail $thumb"
+        done
+    done
+    echo "  moved $count source file(s) to ./originals/"
+    MOVED_ANY=1
+done
+
+echo
+
+if [[ $MOVED_ANY -eq 1 ]]; then
+    rm -rf originals
+    echo "Deleted ./originals/."
+fi
+
+echo "Done."

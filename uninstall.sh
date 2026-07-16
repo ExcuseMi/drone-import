@@ -6,6 +6,7 @@ set -euo pipefail
 echo "Removing drone-import..."
 
 rm -f /usr/local/bin/drone-autoinsert
+rm -f /usr/local/bin/merge-clips
 rm -f /usr/local/bin/drone-sd-cleanup
 rm -f /etc/udev/rules.d/99-drone-import.rules
 rm -f /etc/systemd/system/drone-import@.service
