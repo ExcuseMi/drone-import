@@ -23,8 +23,8 @@ echo "Installing for user: $DRONE_USER"
 echo
 
 # Check dependencies
-for cmd in ffmpeg ffprobe python3 pip3; do
-    command -v "$cmd" &>/dev/null || error "Missing dependency: $cmd"
+for cmd in ffmpeg ffprobe python3 pipx; do
+    command -v "$cmd" &>/dev/null || error "Missing dependency: $cmd (install with: sudo apt install ${cmd})"
 done
 
 # Gather settings
@@ -40,9 +40,10 @@ if [[ -n "$JELLYFIN_URL" ]]; then
 fi
 echo
 
-# Install Python package
+# Install Python package via pipx (isolated venv, no system package conflicts)
 info "Installing drone-import Python package..."
-pip3 install -q -e "$REPO_DIR"
+runuser -u "$DRONE_USER" -- pipx install "$REPO_DIR" 2>/dev/null \
+    || runuser -u "$DRONE_USER" -- pipx reinstall drone-import
 
 # Config directory
 info "Setting up config..."
@@ -125,6 +126,8 @@ echo "    drone-import run hdzero --dry-run"
 echo "    drone-import compress /path/to/file.mp4"
 echo "    drone-import scan"
 echo "    drone-import list-devices"
+echo
+echo "    merge-clips [DIR]"
 echo
 echo "  Logs (auto-import): journalctl -u 'drone-import@*' -f"
 echo "  Logs (compression): journalctl -t drone-compress -f"
