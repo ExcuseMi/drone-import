@@ -34,7 +34,7 @@ def compress_background(src: Path, session_name: str) -> None:
 def _docker_compress(src: Path, session_name: str) -> None:
     """Spawn a sibling container to compress in the background via the host Docker socket."""
     name = f"drone-compress-{session_name.replace(' ', '-')}"
-    subprocess.Popen(
+    subprocess.run(
         [
             "docker", "run", "-d", "--rm",
             f"--name={name}",
@@ -42,10 +42,7 @@ def _docker_compress(src: Path, session_name: str) -> None:
             _IMAGE,
             "drone-import", "compress", str(src),
         ],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
+        check=True,
     )
 
 
