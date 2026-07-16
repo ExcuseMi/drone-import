@@ -20,6 +20,7 @@ mkdir -p "$MOUNT"
 run_import() {
     local device="$1"
     docker run --rm \
+        --network=host \
         -v "$MOUNT:/mnt/drone-import:ro" \
         -v "$MEDIA_VOL:$MEDIA_VOL" \
         -v "$CONFIG_DIR:/root/.config/drone-import:ro" \

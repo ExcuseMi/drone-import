@@ -38,12 +38,9 @@ def _docker_compress(src: Path, session_name: str) -> None:
         [
             "docker", "run", "-d", "--rm",
             f"--name={name}",
-            "-e", f"DRONE_IMPORT_IMAGE={_IMAGE}",
-            "-e", f"DRONE_MEDIA_VOL={_MEDIA_VOL}",
             "-v", f"{_MEDIA_VOL}:{_MEDIA_VOL}",
-            "-v", "/var/run/docker.sock:/var/run/docker.sock",
             _IMAGE,
-            "compress", str(src),
+            "drone-import", "compress", str(src),
         ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
