@@ -28,6 +28,7 @@ class GlobalConfig:
     backup_root: str = "/mnt/media/originals"
     min_duration: int = 10
     clip_start_skip: int = 0
+    session_gap_minutes: int = 30
     jellyfin_url: str = "http://localhost:8096"
     jellyfin_api_key: str = ""
     jellyfin_library_id: str = ""
@@ -46,6 +47,7 @@ def load_config() -> GlobalConfig:
         backup_root=data.get("backup_root", "/mnt/media/originals"),
         min_duration=data.get("min_duration", 10),
         clip_start_skip=data.get("clip_start_skip", 0),
+        session_gap_minutes=data.get("session_gap_minutes", 30),
         jellyfin_url=data.get("jellyfin_url", "http://localhost:8096"),
         jellyfin_api_key=data.get("jellyfin_api_key", ""),
         jellyfin_library_id=data.get("jellyfin_library_id", ""),

@@ -44,9 +44,7 @@ def run_import(
             print("No clips to import.")
             return
 
-        sessions: dict[tuple[str, str], list[Path]] = defaultdict(list)
-        for clip, date_key, hour in clips:
-            sessions[(date_key, hour)].append(clip)
+        sessions = _group_into_sessions(clips, cfg.session_gap_minutes)
 
         imported_any = False
 
@@ -96,6 +94,37 @@ def run_import(
     finally:
         if cleanup and not dry_run:
             _cleanup_sd(dev.mount)
+
+
+def _group_into_sessions(
+    clips: list[tuple[Path, str, str]],
+    gap_minutes: int,
+) -> dict[tuple[str, str], list[Path]]:
+    """Group clips by date, then split on gaps > gap_minutes between consecutive clips.
+    The session hour is taken from the first clip in each group."""
+    by_date: dict[str, list[tuple[Path, str]]] = defaultdict(list)
+    for clip, date_key, hour in clips:
+        by_date[date_key].append((clip, hour))
+
+    sessions: dict[tuple[str, str], list[Path]] = {}
+    gap_seconds = gap_minutes * 60
+
+    for date_key, date_clips in sorted(by_date.items()):
+        date_clips.sort(key=lambda x: x[0].stat().st_mtime)
+        current: list[Path] = [date_clips[0][0]]
+        session_hour = date_clips[0][1]
+
+        for clip, hour in date_clips[1:]:
+            if clip.stat().st_mtime - current[-1].stat().st_mtime > gap_seconds:
+                sessions[(date_key, session_hour)] = current
+                current = [clip]
+                session_hour = hour
+            else:
+                current.append(clip)
+
+        sessions[(date_key, session_hour)] = current
+
+    return sessions
 
 
 def _collect_clips(dev: DeviceConfig, min_duration: int) -> list[tuple[Path, str, str]]:

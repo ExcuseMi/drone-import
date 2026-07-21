@@ -11,6 +11,9 @@ min_duration: 10
 # Override per device in devices/<name>.yaml
 clip_start_skip: 0
 
+# Clips further apart than this (minutes) are treated as separate sessions
+session_gap_minutes: 30
+
 # Jellyfin — leave blank to disable
 jellyfin_url: http://localhost:8096
 jellyfin_api_key: ""
